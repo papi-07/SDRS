@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trusted Contacts – SDRS</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🛡️</div>
+                <div>
+                    <div class="brand-name">SDRS</div>
+                    <div class="brand-sub">Distress Reporting</div>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <span class="nav-label">Main</span>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard">
+                <span class="nav-icon">🏠</span> Dashboard
+            </a>
+            <span class="nav-label">Module</span>
+            <a href="contacts.html" class="nav-item" data-page="contacts">
+                <span class="nav-icon">👥</span> Trusted Contacts
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="sidebarAvatar">U</div>
+                <div>
+                    <div class="user-name"  id="sidebarUserName">User</div>
+                    <div class="user-email" id="sidebarUserEmail"></div>
+                </div>
+            </div>
+            <button class="btn-logout" id="logoutBtn"><span>🚪</span> Sign out</button>
+        </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main -->
+    <div class="main-content">
+        <header class="topbar">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="hamburger" id="hamburger" aria-label="Open menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <span class="topbar-title">Trusted Contacts</span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="page-header">
+                <div>
+                    <h1>Trusted Contacts</h1>
+                    <p>Manage your emergency contacts who will be notified in a distress situation.</p>
+                </div>
+                <a href="add-contact.html" class="btn btn-success btn-sm" style="width:auto;">
+                    ➕ Add Contact
+                </a>
+            </div>
+
+            <div id="alertBox" class="alert"></div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Your Contacts</h2>
+                    <span id="contactCount" style="font-size:.85rem;color:var(--text-muted);"></span>
+                </div>
+                <div id="tableWrapper" class="table-wrapper">
+                    <div style="text-align:center;padding:3rem;color:var(--text-muted);">Loading…</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Delete Contact</h3>
+            <button class="modal-close" id="modalClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete <strong id="deleteContactName"></strong>? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline btn-sm" id="modalCancel">Cancel</button>
+            <button class="btn btn-danger  btn-sm" id="modalConfirm">
+                <span id="deleteBtnText">Delete</span>
+                <span class="spinner" id="deleteSpinner" style="display:none;"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+(function () {
+    if (!SDRS.requireAuth()) return;
+    SDRS.initSidebar('contacts');
+
+    let contacts = [];
+    let deleteId = null;
+
+    const tableWrapper = document.getElementById('tableWrapper');
+    const alertBox     = document.getElementById('alertBox');
+    const deleteModal  = document.getElementById('deleteModal');
+
+    function escHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showAlert(msg, type = 'error') {
+        alertBox.textContent = msg;
+        alertBox.className = `alert alert-${type} show`;
+        setTimeout(() => alertBox.className = 'alert', 4000);
+    }
+
+    const RELATIONSHIP_BADGES = {
+        'Parent':  'badge-blue',
+        'Sibling': 'badge-green',
+        'Spouse':  'badge-purple',
+        'Friend':  'badge-orange',
+        'Other':   'badge-blue'
+    };
+
+    function badgeClass(rel) {
+        return RELATIONSHIP_BADGES[rel] || 'badge-blue';
+    }
+
+    function renderTable() {
+        const countEl = document.getElementById('contactCount');
+        countEl.textContent = contacts.length + ' contact' + (contacts.length !== 1 ? 's' : '');
+
+        if (contacts.length === 0) {
+            tableWrapper.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <h3>No contacts yet</h3>
+                    <p>Add trusted contacts who can be notified in an emergency.</p>
+                    <a href="add-contact.html" class="btn btn-success btn-sm" style="width:auto;">➕ Add Your First Contact</a>
+                </div>`;
+            return;
+        }
+
+        tableWrapper.innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Relationship</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${contacts.map((c, i) => `
+                        <tr>
+                            <td style="color:var(--text-muted);">${i + 1}</td>
+                            <td><strong>${escHtml(c.name)}</strong></td>
+                            <td><span class="badge ${badgeClass(c.relationship)}">${escHtml(c.relationship)}</span></td>
+                            <td>${escHtml(c.phone)}</td>
+                            <td>${c.email ? escHtml(c.email) : '<span style="color:var(--text-muted);">—</span>'}</td>
+                            <td>
+                                <div style="display:flex;gap:.4rem;">
+                                    <a href="edit-contact.html?id=${c.id}" class="btn btn-outline btn-sm" title="Edit">✏️ Edit</a>
+                                    <button class="btn btn-danger btn-sm" data-id="${c.id}" data-name="${escHtml(c.name)}" title="Delete">🗑️ Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+
+        // Attach delete handlers
+        tableWrapper.querySelectorAll('[data-id]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                deleteId = Number(btn.dataset.id);
+                document.getElementById('deleteContactName').textContent = btn.dataset.name;
+                deleteModal.classList.add('open');
+            });
+        });
+    }
+
+    async function loadContacts() {
+        try {
+            const { ok, data } = await SDRS.apiFetch('/api/contacts');
+            if (!ok) { showAlert(data.error || 'Failed to load contacts.'); return; }
+            contacts = data;
+            renderTable();
+        } catch (e) {
+            showAlert('Network error. Please try again.');
+        }
+    }
+
+    // Modal controls
+    function closeModal() {
+        deleteModal.classList.remove('open');
+        deleteId = null;
+    }
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('modalCancel').addEventListener('click', closeModal);
+    deleteModal.addEventListener('click', e => { if (e.target === deleteModal) closeModal(); });
+
+    document.getElementById('modalConfirm').addEventListener('click', async () => {
+        if (!deleteId) return;
+        const btn     = document.getElementById('modalConfirm');
+        const spinner = document.getElementById('deleteSpinner');
+        const text    = document.getElementById('deleteBtnText');
+        btn.disabled = true;
+        spinner.style.display = 'inline-block';
+        text.textContent = 'Deleting…';
+
+        try {
+            const { ok, data } = await SDRS.apiFetch('/api/contacts/' + deleteId, { method: 'DELETE' });
+            if (!ok) { showAlert(data.error || 'Delete failed.'); return; }
+            contacts = contacts.filter(c => c.id !== deleteId);
+            closeModal();
+            renderTable();
+            SDRS.toast('Contact deleted successfully.');
+        } catch {
+            showAlert('Network error. Please try again.');
+        } finally {
+            btn.disabled = false;
+            spinner.style.display = 'none';
+            text.textContent = 'Delete';
+        }
+    });
+
+    loadContacts();
+})();
+</script>
+</body>
+</html>

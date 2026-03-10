@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edit Contact – SDRS</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🛡️</div>
+                <div>
+                    <div class="brand-name">SDRS</div>
+                    <div class="brand-sub">Distress Reporting</div>
+                </div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <span class="nav-label">Main</span>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard">
+                <span class="nav-icon">🏠</span> Dashboard
+            </a>
+            <span class="nav-label">Module</span>
+            <a href="contacts.html" class="nav-item" data-page="contacts">
+                <span class="nav-icon">👥</span> Trusted Contacts
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="sidebarAvatar">U</div>
+                <div>
+                    <div class="user-name"  id="sidebarUserName">User</div>
+                    <div class="user-email" id="sidebarUserEmail"></div>
+                </div>
+            </div>
+            <button class="btn-logout" id="logoutBtn"><span>🚪</span> Sign out</button>
+        </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main -->
+    <div class="main-content">
+        <header class="topbar">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="hamburger" id="hamburger" aria-label="Open menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <span class="topbar-title">Edit Trusted Contact</span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="breadcrumb">
+                <a href="contacts.html">Trusted Contacts</a>
+                <span class="sep">›</span>
+                <span>Edit Contact</span>
+            </div>
+
+            <div class="page-header">
+                <div>
+                    <h1>Edit Trusted Contact</h1>
+                    <p>Update the details for this trusted contact.</p>
+                </div>
+            </div>
+
+            <div id="loadError" class="alert alert-error" style="display:none;max-width:580px;"></div>
+
+            <div class="card form-card" id="formCard">
+                <div class="card-header">
+                    <h2>Contact Details</h2>
+                </div>
+                <div class="card-body">
+                    <div id="alertBox" class="alert"></div>
+
+                    <form id="editContactForm" novalidate>
+                        <div class="form-group">
+                            <label for="name">Full Name <span style="color:var(--danger);">*</span></label>
+                            <input type="text" id="name" name="name" placeholder="e.g. Jane Doe" required />
+                            <span class="field-error" id="nameErr">Name must be at least 2 characters.</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Phone Number <span style="color:var(--danger);">*</span></label>
+                            <input type="tel" id="phone" name="phone" placeholder="e.g. +1 555 123 4567" required />
+                            <span class="field-error" id="phoneErr">Enter a valid phone number (7–20 digits).</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="relationship">Relationship <span style="color:var(--danger);">*</span></label>
+                            <select id="relationship" name="relationship" required>
+                                <option value="" disabled>Select relationship…</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Sibling">Sibling</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Friend">Friend</option>
+                                <option value="Colleague">Colleague</option>
+                                <option value="Neighbor">Neighbor</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <span class="field-error" id="relErr">Please select a relationship.</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email Address <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+                            <input type="email" id="email" name="email" placeholder="e.g. jane@example.com" />
+                            <span class="field-error" id="emailErr">Enter a valid email address.</span>
+                        </div>
+
+                        <div style="display:flex;gap:.75rem;margin-top:1.5rem;">
+                            <a href="contacts.html" class="btn btn-outline btn-sm" style="width:auto;">Cancel</a>
+                            <button type="submit" class="btn btn-primary btn-sm" id="submitBtn" style="width:auto;">
+                                <span id="btnText">💾 Save Changes</span>
+                                <span class="spinner" id="spinner" style="display:none;"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+(function () {
+    if (!SDRS.requireAuth()) return;
+    SDRS.initSidebar('contacts');
+
+    const params    = new URLSearchParams(window.location.search);
+    const contactId = params.get('id');
+
+    const form      = document.getElementById('editContactForm');
+    const alertBox  = document.getElementById('alertBox');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner   = document.getElementById('spinner');
+    const btnText   = document.getElementById('btnText');
+    const loadError = document.getElementById('loadError');
+    const formCard  = document.getElementById('formCard');
+
+    function showAlert(msg, type = 'error') {
+        alertBox.textContent = msg;
+        alertBox.className = `alert alert-${type} show`;
+    }
+    function setErr(id, show) {
+        document.getElementById(id).style.display = show ? 'block' : 'none';
+    }
+
+    async function loadContact() {
+        if (!contactId) {
+            loadError.textContent = 'No contact ID provided.';
+            loadError.style.display = 'block';
+            formCard.style.display = 'none';
+            return;
+        }
+
+        try {
+            const { ok, data } = await SDRS.apiFetch('/api/contacts/' + contactId);
+            if (!ok) {
+                loadError.textContent = data.error || 'Contact not found.';
+                loadError.style.display = 'block';
+                formCard.style.display = 'none';
+                return;
+            }
+
+            document.getElementById('name').value    = data.name   || '';
+            document.getElementById('phone').value   = data.phone  || '';
+            document.getElementById('email').value   = data.email  || '';
+
+            const relSelect = document.getElementById('relationship');
+            for (let i = 0; i < relSelect.options.length; i++) {
+                if (relSelect.options[i].value === data.relationship) {
+                    relSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        } catch {
+            loadError.textContent = 'Failed to load contact.';
+            loadError.style.display = 'block';
+            formCard.style.display = 'none';
+        }
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name         = document.getElementById('name').value.trim();
+        const phone        = document.getElementById('phone').value.trim();
+        const relationship = document.getElementById('relationship').value;
+        const email        = document.getElementById('email').value.trim();
+
+        let valid = true;
+        if (name.length < 2)        { setErr('nameErr', true);  valid = false; } else setErr('nameErr', false);
+        if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { setErr('phoneErr', true); valid = false; } else setErr('phoneErr', false);
+        if (!relationship)          { setErr('relErr',  true);  valid = false; } else setErr('relErr', false);
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('emailErr', true); valid = false; } else setErr('emailErr', false);
+
+        if (!valid) return;
+
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.textContent = 'Saving…';
+
+        try {
+            const { ok, data } = await SDRS.apiFetch('/api/contacts/' + contactId, {
+                method: 'PUT',
+                body: JSON.stringify({ name, phone, relationship, email: email || null })
+            });
+
+            if (!ok) {
+                showAlert(data.error || 'Failed to update contact.');
+                return;
+            }
+
+            SDRS.toast('Contact updated successfully!');
+            window.location.href = 'contacts.html';
+        } catch {
+            showAlert('Network error. Please try again.');
+        } finally {
+            submitBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = '💾 Save Changes';
+        }
+    });
+
+    loadContact();
+})();
+</script>
+</body>
+</html>

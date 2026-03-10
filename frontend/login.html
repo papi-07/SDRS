@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login – SDRS</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-icon">🛡️</div>
+            <div>
+                <div class="logo-text">SDRS</div>
+                <div class="logo-sub">Silent Distress Reporting System</div>
+            </div>
+        </div>
+
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to your account to continue</p>
+
+        <div id="alert" class="alert alert-error"></div>
+
+        <form id="loginForm" novalidate>
+            <div class="form-group">
+                <label for="email">Email address</label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required />
+                <span class="field-error" id="emailErr">Please enter a valid email.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required />
+                <span class="field-error" id="passwordErr">Password is required.</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                <span id="btnText">Sign in</span>
+                <span class="spinner" id="spinner" style="display:none;"></span>
+            </button>
+        </form>
+
+        <p class="auth-footer">
+            Don't have an account? <a href="register.html">Create one</a>
+        </p>
+    </div>
+</div>
+
+<script>
+(function () {
+    const API = '';
+
+    // Redirect if already logged in
+    if (localStorage.getItem('sdrs_token')) {
+        window.location.href = 'dashboard.html';
+    }
+
+    const form      = document.getElementById('loginForm');
+    const alertBox  = document.getElementById('alert');
+    const spinner   = document.getElementById('spinner');
+    const btnText   = document.getElementById('btnText');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function showAlert(msg) {
+        alertBox.textContent = msg;
+        alertBox.className = 'alert alert-error show';
+    }
+    function clearAlert() {
+        alertBox.className = 'alert alert-error';
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAlert();
+
+        const email    = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        // Basic client-side validation
+        let valid = true;
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            document.getElementById('emailErr').style.display = 'block';
+            valid = false;
+        } else {
+            document.getElementById('emailErr').style.display = 'none';
+        }
+        if (!password) {
+            document.getElementById('passwordErr').style.display = 'block';
+            valid = false;
+        } else {
+            document.getElementById('passwordErr').style.display = 'none';
+        }
+        if (!valid) return;
+
+        // Show loading state
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.textContent = 'Signing in…';
+
+        try {
+            const res  = await fetch(API + '/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showAlert(data.error || 'Login failed. Please try again.');
+                return;
+            }
+
+            localStorage.setItem('sdrs_token', data.token);
+            localStorage.setItem('sdrs_user', JSON.stringify(data.user));
+            window.location.href = 'dashboard.html';
+        } catch (err) {
+            showAlert('Network error. Please check your connection.');
+        } finally {
+            submitBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = 'Sign in';
+        }
+    });
+})();
+</script>
+</body>
+</html>

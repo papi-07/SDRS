@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard – SDRS</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🛡️</div>
+                <div>
+                    <div class="brand-name">SDRS</div>
+                    <div class="brand-sub">Distress Reporting</div>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <span class="nav-label">Main</span>
+            <a href="dashboard.html" class="nav-item" data-page="dashboard">
+                <span class="nav-icon">🏠</span> Dashboard
+            </a>
+
+            <span class="nav-label">Module</span>
+            <a href="contacts.html" class="nav-item" data-page="contacts">
+                <span class="nav-icon">👥</span> Trusted Contacts
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar" id="sidebarAvatar">U</div>
+                <div>
+                    <div class="user-name"  id="sidebarUserName">User</div>
+                    <div class="user-email" id="sidebarUserEmail"></div>
+                </div>
+            </div>
+            <button class="btn-logout" id="logoutBtn">
+                <span>🚪</span> Sign out
+            </button>
+        </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main content -->
+    <div class="main-content">
+        <header class="topbar">
+            <div style="display:flex;align-items:center;gap:1rem;">
+                <button class="hamburger" id="hamburger" aria-label="Open menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <span class="topbar-title">Dashboard</span>
+            </div>
+        </header>
+
+        <main class="page-content">
+            <div class="page-header">
+                <div>
+                    <h1 id="welcomeMsg">Welcome back!</h1>
+                    <p>Here's an overview of your SDRS account.</p>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue">👥</div>
+                    <div>
+                        <div class="stat-value" id="statContacts">–</div>
+                        <div class="stat-label">Trusted Contacts</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">✅</div>
+                    <div>
+                        <div class="stat-value">Active</div>
+                        <div class="stat-label">Account Status</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">🛡️</div>
+                    <div>
+                        <div class="stat-value">Protected</div>
+                        <div class="stat-label">Safety Mode</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="card-body" style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    <a href="contacts.html" class="btn btn-primary btn-sm" style="width:auto;">
+                        👥 Manage Contacts
+                    </a>
+                    <a href="add-contact.html" class="btn btn-success btn-sm" style="width:auto;">
+                        ➕ Add New Contact
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recent contacts preview -->
+            <div class="card" style="margin-top:1.5rem;">
+                <div class="card-header">
+                    <h2>Recent Trusted Contacts</h2>
+                    <a href="contacts.html" style="font-size:.85rem;color:var(--primary);text-decoration:none;font-weight:600;">View all →</a>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Relationship</th>
+                                <th>Phone</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentContactsTbody">
+                            <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:2rem;">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+(function () {
+    if (!SDRS.requireAuth()) return;
+    SDRS.initSidebar('dashboard');
+
+    const user = SDRS.getUser();
+    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + (user.name || 'User') + '!';
+
+    // Load contacts count + recent
+    SDRS.apiFetch('/api/contacts').then(({ ok, data }) => {
+        if (!ok) return;
+        document.getElementById('statContacts').textContent = data.length;
+
+        const tbody = document.getElementById('recentContactsTbody');
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:2rem;">No contacts yet. <a href="add-contact.html">Add one</a>.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.slice(0, 5).map(c => `
+            <tr>
+                <td><strong>${escHtml(c.name)}</strong></td>
+                <td><span class="badge badge-blue">${escHtml(c.relationship)}</span></td>
+                <td>${escHtml(c.phone)}</td>
+            </tr>
+        `).join('');
+    }).catch(() => {});
+
+    function escHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+})();
+</script>
+</body>
+</html>

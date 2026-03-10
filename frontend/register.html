@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register – SDRS</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="auth-wrapper">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-icon">🛡️</div>
+            <div>
+                <div class="logo-text">SDRS</div>
+                <div class="logo-sub">Silent Distress Reporting System</div>
+            </div>
+        </div>
+
+        <h1 class="auth-title">Create an account</h1>
+        <p class="auth-subtitle">Join SDRS to manage your safety contacts</p>
+
+        <div id="alert" class="alert alert-error"></div>
+
+        <form id="registerForm" novalidate>
+            <div class="form-group">
+                <label for="name">Full name</label>
+                <input type="text" id="name" name="name" placeholder="Jane Doe" autocomplete="name" required />
+                <span class="field-error" id="nameErr">Name must be at least 2 characters.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email address</label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required />
+                <span class="field-error" id="emailErr">Please enter a valid email.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="new-password" required />
+                <span class="input-hint">Minimum 6 characters.</span>
+                <span class="field-error" id="passwordErr">Password must be at least 6 characters.</span>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="••••••••" autocomplete="new-password" required />
+                <span class="field-error" id="confirmErr">Passwords do not match.</span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                <span id="btnText">Create account</span>
+                <span class="spinner" id="spinner" style="display:none;"></span>
+            </button>
+        </form>
+
+        <p class="auth-footer">
+            Already have an account? <a href="login.html">Sign in</a>
+        </p>
+    </div>
+</div>
+
+<script>
+(function () {
+    const API = '';
+
+    // Redirect if already logged in
+    if (localStorage.getItem('sdrs_token')) {
+        window.location.href = 'dashboard.html';
+    }
+
+    const form      = document.getElementById('registerForm');
+    const alertBox  = document.getElementById('alert');
+    const spinner   = document.getElementById('spinner');
+    const btnText   = document.getElementById('btnText');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function showAlert(msg, type = 'error') {
+        alertBox.textContent = msg;
+        alertBox.className = `alert alert-${type} show`;
+    }
+    function clearAlert() {
+        alertBox.className = 'alert alert-error';
+    }
+    function setFieldError(id, show) {
+        document.getElementById(id).style.display = show ? 'block' : 'none';
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        clearAlert();
+
+        const name            = document.getElementById('name').value.trim();
+        const email           = document.getElementById('email').value.trim();
+        const password        = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        let valid = true;
+
+        if (name.length < 2) { setFieldError('nameErr', true);    valid = false; } else setFieldError('nameErr', false);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setFieldError('emailErr', true); valid = false; } else setFieldError('emailErr', false);
+        if (password.length < 6) { setFieldError('passwordErr', true); valid = false; } else setFieldError('passwordErr', false);
+        if (password !== confirmPassword) { setFieldError('confirmErr', true); valid = false; } else setFieldError('confirmErr', false);
+
+        if (!valid) return;
+
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+        btnText.textContent = 'Creating account…';
+
+        try {
+            const res  = await fetch(API + '/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                showAlert(data.error || 'Registration failed. Please try again.');
+                return;
+            }
+
+            localStorage.setItem('sdrs_token', data.token);
+            localStorage.setItem('sdrs_user', JSON.stringify(data.user));
+            window.location.href = 'dashboard.html';
+        } catch (err) {
+            showAlert('Network error. Please check your connection.');
+        } finally {
+            submitBtn.disabled = false;
+            spinner.style.display = 'none';
+            btnText.textContent = 'Create account';
+        }
+    });
+})();
+</script>
+</body>
+</html>
